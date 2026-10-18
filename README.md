@@ -1,12 +1,13 @@
 # Disciplr Frontend
 
 [![CI](https://github.com/Disciplr-Org/Disciplr-Frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/Disciplr-Org/Disciplr-Frontend/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/live-demo-7c9cff)](https://disciplr-frontend.vercel.app)
 [![API](https://img.shields.io/badge/API-live-3ddc97)](https://disciplr-api.vercel.app)
 
 Web app for **Disciplr**: commitment vaults on Stellar. Lock USDC against milestones, have a verifier confirm progress, and release funds on success or redirect them on failure.
 
 - **Live API (used by this app):** https://disciplr-api.vercel.app ([backend repo](https://github.com/Disciplr-Org/Disciplr-backend))
-- **Live site:** not yet published. The Vercel deployment is blocked by the free-plan upload limit (`api-upload-free`, resets 24 hours after it was hit); see Deployment below.
+- **Live demo:** https://disciplr-frontend.vercel.app
 
 ## Features
 
@@ -50,10 +51,10 @@ npm test                 # vitest
 
 ## Deployment
 
-Configured for Vercel (`vercel.json`: Vite build, SPA rewrite). The project `disciplr-frontend` exists with `VITE_API` set for production. To publish:
+Configured for Vercel (`vercel.json`: Vite build, SPA rewrite). Deployed as Vercel project `disciplr-frontend` with `VITE_API` set for production. To redeploy:
 
 ```bash
-vercel --prod --yes          # or: vercel build --prod && vercel deploy --prebuilt --prod
+vercel --prod --yes          # if the free-plan upload limit is hit: vercel build --prod && vercel deploy --prebuilt --prod --archive=tgz
 ```
 
 ## Demo limitations
