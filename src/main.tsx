@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import App from './App'
+import './tailwind.css'
 import './index.css'
 import { reportWebVitals } from './utils/reportWebVitals'
 

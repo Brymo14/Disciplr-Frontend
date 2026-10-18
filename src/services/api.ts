@@ -59,6 +59,7 @@ export function toVault(v: ApiVault): Vault {
     description: `${Number(m.amount).toLocaleString()} USDC, due ${new Date(m.dueDate).toLocaleDateString()}`,
     criteria: m.title,
     status: m.status === "completed" ? "validated" : m.status === "failed" ? "failed" : "pending",
+    ...(m.status === "completed" ? { validatedAt: v.updatedAt || v.createdAt } : {}),
   }));
   return {
     id: v.id,

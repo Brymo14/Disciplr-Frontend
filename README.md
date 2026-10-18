@@ -1,13 +1,15 @@
 # Disciplr Frontend
 
+**Live demo: https://disciplr-frontend-alpha.vercel.app**
+
 [![CI](https://github.com/Disciplr-Org/Disciplr-Frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/Disciplr-Org/Disciplr-Frontend/actions/workflows/ci.yml)
-[![Live demo](https://img.shields.io/badge/live-demo-7c9cff)](https://disciplr-frontend.vercel.app)
+[![Live demo](https://img.shields.io/badge/live-demo-7c9cff)](https://disciplr-frontend-alpha.vercel.app)
 [![API](https://img.shields.io/badge/API-live-3ddc97)](https://disciplr-api.vercel.app)
 
 Web app for **Disciplr**: commitment vaults on Stellar. Lock USDC against milestones, have a verifier confirm progress, and release funds on success or redirect them on failure.
 
 - **Live API (used by this app):** https://disciplr-api.vercel.app ([backend repo](https://github.com/Disciplr-Org/Disciplr-backend))
-- **Live demo:** https://disciplr-frontend.vercel.app
+- **Live demo:** https://disciplr-frontend-alpha.vercel.app
 
 ## Features
 

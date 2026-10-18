@@ -272,7 +272,7 @@ export default function ValidationHistory() {
                   <Text role="body" as="h3">{task.vaultName}</Text>
                   <Text role="body" as="p" className="text-sm font-medium">{task.milestone}</Text>
                   <span
-                    className="text-xs px-2 py-1 rounded font-mono w-max"
+                    className="text-xs px-2 py-1 rounded font-mono max-w-full break-all"
                     style={{
                       background: 'var(--bg)',
                       color: 'var(--text)',

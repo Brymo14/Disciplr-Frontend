@@ -883,7 +883,7 @@ function NetworkFooterBanner({ network, contractAddress }: NetworkFooterBannerPr
         <Text
           role="mono"
           as="span"
-          style={{ color: "var(--muted)", fontSize: 12, flex: 1, minWidth: 0 }}
+          style={{ color: "var(--muted)", fontSize: 12, flex: "1 1 100%", minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-all" }}
           aria-label={`Contract address: ${contractAddress}`}
         >
           {contractAddress}

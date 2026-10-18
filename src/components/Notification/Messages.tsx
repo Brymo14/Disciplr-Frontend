@@ -78,8 +78,6 @@ export default function Message({
                   className={`${
                     safeRead
                       ? "text-[#667589]"
-                      : isFullPage
-                      ? "text-white"
                       : "text-black"
                   } font-bold`}
                 >

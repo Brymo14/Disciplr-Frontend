@@ -260,10 +260,33 @@ export default function Layout({ children }: LayoutProps) {
           maxWidth: "var(--container-standard)",
           margin: "0 auto",
           width: "100%",
+          minWidth: 0,
+          boxSizing: "border-box",
         }}
       >
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
+      <footer
+        {...backgroundAccessibilityProps}
+        style={{
+          padding: "var(--spacing-4, 1rem) var(--spacing-8, 2rem)",
+          textAlign: "center",
+          fontSize: "0.875rem",
+          opacity: 0.85,
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          gap: "0.5rem 1.25rem",
+        }}
+      >
+        <a href="https://github.com/Disciplr-Org/Disciplr-Frontend" target="_blank" rel="noopener noreferrer">
+          GitHub
+        </a>
+        <a href="https://disciplr-frontend-alpha.vercel.app" target="_blank" rel="noopener noreferrer">
+          Live demo
+        </a>
+        <Link to="/docs">Docs</Link>
+      </footer>
       <ShortcutsHelp />
       <ToastViewport />
     </div>

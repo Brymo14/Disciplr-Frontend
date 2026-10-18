@@ -557,9 +557,8 @@ export default function Dashboard({
 
       {/* ── Main grid: vault list + sidebar ── */}
       <div
+        className="dashboard-main-grid"
         style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0,1fr) minmax(0,340px)",
           gap: "1.25rem",
           alignItems: "start",
         }}

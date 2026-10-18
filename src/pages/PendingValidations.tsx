@@ -197,7 +197,7 @@ export default function PendingValidations() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6 p-6 min-w-0 max-w-full">
       <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-2">
         <div>
           <button
@@ -292,7 +292,7 @@ export default function PendingValidations() {
         </label>
       </section>
 
-      <section className="border rounded-lg shadow-sm overflow-x-auto" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+      <section className="border rounded-lg shadow-sm overflow-x-auto max-w-full relative" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
         {sortedValidations.length === 0 ? (
           <div className="p-12 text-center" style={{ color: 'var(--muted)' }}>
             {pendingValidations.length === 0 ? (

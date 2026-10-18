@@ -560,3 +560,14 @@ a:hover {
     scroll-behavior: auto !important;
   }
 }
+
+/* Dashboard: two columns on desktop, single column on small screens */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+}
+@media (max-width: 860px) {
+  .dashboard-main-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
