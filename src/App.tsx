@@ -9,10 +9,8 @@ import RequireWallet from './components/RequireWallet'
 import Skeleton from './components/Skeleton'
 import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
-import Vaults from './pages/Vaults'
 import CreateVault from './pages/CreateVault'
 import VaultDetail from './pages/VaultDetail'
-import VaultTransactions from './pages/VaultTransactions'
 import VerifierDashboard from './pages/VerifierDashboard'
 import PendingValidations from './pages/PendingValidations'
 import ValidationDetail from './pages/ValidationDetail'
@@ -92,11 +90,8 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<RouteErrorBoundary><Home /></RouteErrorBoundary>} />
                 <Route path="/dashboard" element={<RouteErrorBoundary><Dashboard /></RouteErrorBoundary>} />
-                <Route path="/vaults" element={<RouteErrorBoundary><Vaults /></RouteErrorBoundary>} />
                 <Route path="/vaults/create" element={<RouteErrorBoundary><ProtectedRoute><CreateVault /></ProtectedRoute></RouteErrorBoundary>} />
                 <Route path="/vaults/:id" element={<RouteErrorBoundary><ProtectedRoute><VaultDetail /></ProtectedRoute></RouteErrorBoundary>} />
-                <Route path="/vaults/:id/transactions" element={<RouteErrorBoundary><VaultTransactions /></RouteErrorBoundary>} />
-                <Route path="/transactions" element={<RouteErrorBoundary><VaultTransactions /></RouteErrorBoundary>} />
                 <Route path="/verifier" element={<RouteErrorBoundary><VerifierDashboard /></RouteErrorBoundary>} />
                 <Route path="/verifier/queue" element={<RouteErrorBoundary><ProtectedRoute><PendingValidations /></ProtectedRoute></RouteErrorBoundary>} />
                 <Route path="/verifier/queue/:vaultId" element={<RouteErrorBoundary><ProtectedRoute><ValidationDetail /></ProtectedRoute></RouteErrorBoundary>} />

@@ -1,6 +1,5 @@
-import React, { useState, useCallback, Component, ReactNode } from 'react';
+import React, { useState, useCallback, Component, ReactNode, useMemo } from 'react';
 import { useTheme } from '../context/ThemeContext';
-import { useCallback, useMemo } from 'react';
 import './Layout.css';
 
 /**
@@ -245,10 +244,3 @@ export default function ThemeToggle() {
   );
 }
 
-export default function ThemeToggle() {
-  return (
-    <ThemeToggleErrorBoundary>
-      <ThemeToggleInner />
-    </ThemeToggleErrorBoundary>
-  );
-}

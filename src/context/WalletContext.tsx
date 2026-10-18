@@ -96,9 +96,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const lastKnownAddressRef = useRef<string | null>(null);
     const lastKnownNetworkRef = useRef<WalletNetwork | null>(null);
     const checkConnectionInProgress = useRef(false);
-    const operationSeqRef = useRef(0);
-    const connectAttemptRef = useRef(0);
-    const connectInFlightRef = useRef<Promise<boolean> | null>(null);
 
     const normalizeNetwork = (networkName: string): WalletNetwork => {
         return networkName === 'PUBLIC' ? 'PUBLIC' : 'TESTNET';
@@ -108,7 +105,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
-        const seq = operationSeqRef.current;
         abortControllerRef.current = new AbortController();
 
         dispatch({ type: 'BALANCE_FETCH_START' });
