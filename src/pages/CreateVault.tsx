@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { Text } from "../components/Text";
 import { Field } from "../components/Field";
 import type {
@@ -23,8 +23,9 @@ import {
   getPresetLabel,
 } from "../utils/deadlinePresets";
 import { getCreateVaultPrefill } from "../utils/vaultPrefill";
-import { createVault } from "../services/vaultService";
+import { createVault, CreateIntegrityError } from "../services/vaultService";
 import { isNetworkMismatch, APP_EXPECTED_NETWORK } from "../utils/networkMismatch";
+
 import { isValidStellarAddress } from "../utils/stellarAddress";
 
 interface MilestoneFormRow extends CreateVaultMilestoneInput {
@@ -79,8 +80,10 @@ export default function CreateVault() {
   const isSubmittingRef = useRef(false);
   const [submissionUncertain, setSubmissionUncertain] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [integrityError, setIntegrityError] = useState<CreateIntegrityError | null>(null);
 
   const errorFieldOrder: Array<
+
     "amount" | "deadline" | "successAddress" | "failureAddress"
   > = ["amount", "deadline", "successAddress", "failureAddress"];
 
@@ -262,7 +265,16 @@ export default function CreateVault() {
       }
 
       navigate(`/vaults/${newVault.id}`);
-    } catch {
+    } catch (err) {
+      if (err instanceof CreateIntegrityError) {
+        // Post-creation integrity check failed: do not navigate silently.
+        // Don't log full addresses in the integrity error.
+        logger.error("Vault creation integrity mismatch detected");
+        setIntegrityError(err);
+        setIsSubmitting(false);
+        return;
+      }
+
       // The service may have created the vault even when its response failed.
       // Do not expose raw service errors or silently make a second create call.
       logger.error("Vault creation outcome unknown");
@@ -291,7 +303,79 @@ export default function CreateVault() {
         redirect on failure.
       </Text>
 
-      {showReview ? (
+      {integrityError ? (
+        <div
+          role="alert"
+          aria-live="assertive"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "1rem",
+            maxWidth: 540,
+            padding: "1.25rem",
+            border: "1px solid var(--danger)",
+            borderRadius: "var(--radius)",
+            background: "color-mix(in srgb, var(--danger) 8%, var(--surface))",
+            marginBottom: "1.5rem",
+          }}
+        >
+          <Text role="display" as="h2" style={{ color: "var(--danger)" }}>
+            Vault Verification Warning
+          </Text>
+          <Text role="body" as="p">
+            The vault was created on the server, but one or more stored values differ from what you confirmed. Please review the vault details below:
+          </Text>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: "1.25rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+            }}
+          >
+            {Object.entries(integrityError.mismatches).map(([field, diff]) => (
+              <li key={field} style={{ wordBreak: "break-all" }}>
+                <strong>{field}:</strong> expected <code>{diff?.expected}</code>, but server stored <code>{diff?.actual}</code>
+              </li>
+            ))}
+          </ul>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
+            <Link
+              to={`/vaults/${integrityError.vault.id}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "var(--accent)",
+                color: "var(--bg)",
+                padding: "0.6rem 1.25rem",
+                borderRadius: "var(--radius)",
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              Review Vault
+            </Link>
+            <Link
+              to="/vaults"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "transparent",
+                color: "var(--text)",
+                border: "1px solid var(--border)",
+                padding: "0.6rem 1.25rem",
+                borderRadius: "var(--radius)",
+                textDecoration: "none",
+              }}
+            >
+              All Vaults
+            </Link>
+          </div>
+        </div>
+      ) : showReview ? (
         <CreateVaultReview
           amount={amount}
           deadline={deadline}
@@ -306,6 +390,7 @@ export default function CreateVault() {
           onCheckVaults={() => navigate("/vaults")}
         />
       ) : (
+
         <>
           {allErrorEntries.length > 0 && (
             <div
