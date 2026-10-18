@@ -20,6 +20,7 @@ import {
   type VaultAction,
 } from "../utils/vaultState";
 import { createSingleFlightRunner } from "../utils/singleFlight";
+import { normalizeEvidenceUrl } from "../utils/url";
 import {
   isApiEnabled,
   apiListVaults,
@@ -133,6 +134,7 @@ export async function createVault(vaultData: {
   creatorAddress: string;
   successAddress: string;
   failureAddress: string;
+  evidenceUrl?: string;
   milestones: Omit<Milestone, "id" | "status">[];
 }): Promise<Vault> {
   if (!vaultData.name || vaultData.name.trim().length === 0) {
@@ -167,11 +169,19 @@ export async function createVault(vaultData: {
     successAddress: vaultData.successAddress,
     failureAddress: vaultData.failureAddress,
     contractAddress: `GCONT${nextId}KQKM4XNQPBEZMXPOLKQKM4XNQPBEZMXPOLKQK`,
-    milestones: vaultData.milestones.map((m, index) => ({
-      ...m,
-      id: `m${nextId}_${index + 1}`,
-      status: "pending"
-    })),
+    milestones: vaultData.milestones.map(({ evidenceUrl: milestoneEvidence, ...m }, index) => {
+      const rawEvidence =
+        milestoneEvidence ?? (index === 0 ? vaultData.evidenceUrl : undefined);
+      const safeEvidence = rawEvidence
+        ? normalizeEvidenceUrl(rawEvidence) ?? undefined
+        : undefined;
+      return {
+        ...m,
+        ...(safeEvidence ? { evidenceUrl: safeEvidence } : {}),
+        id: `m${nextId}_${index + 1}`,
+        status: "pending",
+      };
+    }),
     transactions: [
       {
         id: `tx${nextId}_1`,
