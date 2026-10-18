@@ -8,3 +8,5 @@ coverage
 
 # Working on it 
 .opencode
+.vercel
+.env*

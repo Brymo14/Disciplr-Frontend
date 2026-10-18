@@ -202,6 +202,12 @@ export default function Layout({ children }: LayoutProps) {
               </Text>
             </NavLink>
 
+            <NavLink to="/docs" className="header-link">
+              <Text role="caption" as="span">
+                Docs
+              </Text>
+            </NavLink>
+
             <NavLink
               to="/help"
               className="header-link"

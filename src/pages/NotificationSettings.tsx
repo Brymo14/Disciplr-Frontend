@@ -20,7 +20,6 @@ export default function NotificationSettings() {
     push: pushNotification,
     frequency,
     quietHours,
-    quietHoursRange,
     setEmail: setEmailNotification,
     setPush: setPushNotification,
     setFrequency,
@@ -37,9 +36,12 @@ export default function NotificationSettings() {
   // Determine whether the current time falls within the quiet hour window.
   // quietHours is a single "HH:MM" boundary. Quiet is considered active if
   // the current hour:minute matches or is past the stored quiet-hours value.
+  const [quietStartValue, setQuietStartValue] = useState<string>(isValidQuietTime(quietHours) ? quietHours : "22:00");
+  const [quietEndValue, setQuietEndValue] = useState<string>("07:00");
+  const quietRangeIsValid = isValidQuietHoursRange(quietStartValue, quietEndValue);
   const quietHoursValid = isValidQuietTime(quietHours);
   const quietHoursActive = useMemo(
-    () => isQuietHoursActive(quietStartValue, quietEndValue),
+    () => isQuietHoursActive(new Date(), quietStartValue, quietEndValue),
     [quietStartValue, quietEndValue]
   );
 

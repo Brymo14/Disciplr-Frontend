@@ -126,6 +126,7 @@ export default function VaultDetail() {
           vault={view.vault}
           walletAddress={address}
           walletNetwork={network}
+          onChanged={retry}
         />
       );
   }
@@ -276,12 +277,14 @@ interface VaultDetailContentProps {
   vault: Vault;
   walletAddress: string | null;
   walletNetwork: WalletNetwork | null;
+  onChanged?: () => void;
 }
 
 function VaultDetailContent({
   vault,
   walletAddress,
   walletNetwork,
+  onChanged,
 }: VaultDetailContentProps) {
   const { network } = useWallet();
 
@@ -322,6 +325,7 @@ function VaultDetailContent({
     try {
       await submitVaultAction(activeAction, vault.id);
       setActiveAction(null);
+      onChanged?.();
     } catch (err) {
       setActionError(
         err instanceof Error
@@ -438,7 +442,7 @@ function VaultDetailContent({
             </Link>
             {isActive && (
               <>
-                {vault.status === "pending_validation" && (
+                {(vault.status === "pending_validation" || vault.status === "active") && (
                   <ActionButton
                     label="Validate Milestone"
                     color="var(--accent)"

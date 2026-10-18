@@ -8,7 +8,17 @@ import { getAtRiskVaults } from "../utils/atRiskVaults";
 import { useCallback, useMemo, useState, useEffect } from "react";
 import * as dashboardUtils from "../utils/dashboard";
 import type { VaultPreview, Activity, Deadline } from "../utils/dashboard";
-import type { Milestone, Vault } from "../types/vault";
+import type { Milestone, Vault, VaultStatus } from "../types/vault";
+import {
+  isValidVaultRouteId,
+  isNonEmptyString,
+  isVaultStatus,
+  isPositiveAmount,
+  isValidCurrency,
+  isValidIsoTimestamp,
+} from "../utils/vaultState";
+import { createSingleFlightRunner } from "../utils/singleFlight";
+import { logger } from "../utils/logger";
 import { timelineProgress } from "../utils/vaultLifecycle";
 import { validateVaultPreview, sanitizeActivity } from "../utils/dashboardValidation";
 

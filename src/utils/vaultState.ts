@@ -622,7 +622,7 @@ export function evalVaultActionAuth({
     reasons.push("This vault has already settled and no actions remain.");
   }
 
-  if (action === "validate_milestone" && vault.status !== "pending_validation") {
+  if (action === "validate_milestone" && vault.status !== "pending_validation" && vault.status !== "active") {
     reasons.push("No milestone is currently pending validation.");
   }
 

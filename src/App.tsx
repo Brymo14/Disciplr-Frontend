@@ -17,6 +17,9 @@ import ValidationDetail from './pages/ValidationDetail'
 import ValidationHistory from './pages/ValidationHistory'
 import HelpCenter from './pages/HelpCenter'
 import NotFound from './pages/NotFound'
+import Vaults from './pages/Vaults'
+import Transactions from './pages/Transactions'
+import Docs from './pages/Docs'
 
 const Analytics = lazy(() => import('./pages/Analytics'))
 const Notification = lazy(() => import('./pages/Notification'))
@@ -90,6 +93,9 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<RouteErrorBoundary><Home /></RouteErrorBoundary>} />
                 <Route path="/dashboard" element={<RouteErrorBoundary><Dashboard /></RouteErrorBoundary>} />
+                <Route path="/vaults" element={<RouteErrorBoundary><Vaults /></RouteErrorBoundary>} />
+                <Route path="/transactions" element={<RouteErrorBoundary><Transactions /></RouteErrorBoundary>} />
+                <Route path="/docs" element={<RouteErrorBoundary><Docs /></RouteErrorBoundary>} />
                 <Route path="/vaults/create" element={<RouteErrorBoundary><ProtectedRoute><CreateVault /></ProtectedRoute></RouteErrorBoundary>} />
                 <Route path="/vaults/:id" element={<RouteErrorBoundary><ProtectedRoute><VaultDetail /></ProtectedRoute></RouteErrorBoundary>} />
                 <Route path="/verifier" element={<RouteErrorBoundary><VerifierDashboard /></RouteErrorBoundary>} />

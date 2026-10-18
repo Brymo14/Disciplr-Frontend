@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 import {
     recordWalletTelemetry,
     classifyConnectError,
+    type ConnectErrorCode,
 } from '../utils/walletTelemetry';
 
 export type WalletNetwork = 'TESTNET' | 'PUBLIC';
@@ -78,10 +79,13 @@ interface WalletContextType extends WalletState {
     connect: () => Promise<boolean>;
     disconnect: () => void;
     checkConnection: () => Promise<void>;
+    connectDemo: () => void;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
+/** Public, keyless demo account used by "Try demo mode". Not a real funded account. */
+export const DEMO_ADDRESS = 'GBVAQKGA5P4TIZSZJBS5AW3XNJOTYG6I3Y5CLIGCBBUZDHMVF7YE7XCQ';
 export const BALANCE_REFRESH_INTERVAL = 30_000;
 export const ACCOUNT_POLL_INTERVAL = 2_000; // Check account explicitly every 2s
 
@@ -96,6 +100,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const lastKnownAddressRef = useRef<string | null>(null);
     const lastKnownNetworkRef = useRef<WalletNetwork | null>(null);
     const checkConnectionInProgress = useRef(false);
+    const demoModeRef = useRef(false);
 
     const normalizeNetwork = (networkName: string): WalletNetwork => {
         return networkName === 'PUBLIC' ? 'PUBLIC' : 'TESTNET';
@@ -182,7 +187,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
     // Fast polling for account changes & standard polling for balance
     useEffect(() => {
-        if (!state.address) return;
+        if (!state.address || demoModeRef.current) return;
 
         let lastBalanceCheck = Date.now();
         
@@ -338,6 +343,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
 
     const disconnect = useCallback(() => {
+        demoModeRef.current = false;
         operationSeqRef.current++;
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
@@ -347,6 +353,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         lastKnownAddressRef.current = null;
         lastKnownNetworkRef.current = null;
         dispatch({ type: 'DISCONNECT' });
+    }, []);
+
+    // Demo mode: lets visitors without Freighter explore the app on testnet with a built-in account.
+    const connectDemo = useCallback(() => {
+        operationSeqRef.current++;
+        demoModeRef.current = true;
+        localStorage.removeItem(WALLET_DISCONNECTED_KEY);
+        lastKnownAddressRef.current = DEMO_ADDRESS;
+        dispatch({ type: 'CONNECT_SUCCESS', payload: { address: DEMO_ADDRESS, network: 'TESTNET' } });
+        dispatch({ type: 'BALANCE_FETCH_SUCCESS', payload: { balance: '10000.0000000', status: 'success', network: 'TESTNET' } });
     }, []);
 
     const isConnecting = state.status === 'connecting' || state.status === 'restoring';
@@ -359,6 +375,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 connect,
                 disconnect,
                 checkConnection,
+                connectDemo,
             }}
         >
             {children}

@@ -11,7 +11,7 @@ interface WalletSelectionModalProps {
 }
 
 export function WalletSelectionModal({ onClose }: WalletSelectionModalProps) {
-    const { connect, isConnecting, error, address } = useWallet();
+    const { connect, connectDemo, isConnecting, error, address } = useWallet();
     const isConnected = address !== null;
 
     const isMounted = useRef(true);
@@ -109,6 +109,19 @@ export function WalletSelectionModal({ onClose }: WalletSelectionModalProps) {
                         <span className="wallet-name">Albedo</span>
                     </div>
                     <span className="wallet-status wallet-coming-soon">Coming soon</span>
+                </button>
+                <button
+                    className="wallet-option"
+                    onClick={() => { connectDemo(); onClose(); }}
+                    title="Explore with a built-in testnet demo account, no wallet needed"
+                >
+                    <div className="wallet-option-info">
+                        <div className="wallet-icon">
+                            <ShieldCheck size={20} color="var(--accent)" />
+                        </div>
+                        <span className="wallet-name">Demo account</span>
+                    </div>
+                    <span className="wallet-status">No wallet needed</span>
                 </button>
             </div>
 

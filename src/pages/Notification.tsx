@@ -61,13 +61,13 @@ export default function Notification() {
   // If filters or data shrink the result set, clamp the page to avoid
   // rendering an empty page while valid items exist on earlier pages.
   useEffect(() => {
-    const totalPages = Math.max(1, pagination.totalPages ?? 1);
+    const totalPages = Math.max(1, pagination.pageCount ?? 1);
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     } else if (currentPage < 1) {
       setCurrentPage(1);
     }
-  }, [currentPage, pagination.totalPages]);
+  }, [currentPage, pagination.pageCount]);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const filterButtonRef = useRef<HTMLButtonElement | null>(null);

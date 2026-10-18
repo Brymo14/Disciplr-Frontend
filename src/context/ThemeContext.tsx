@@ -117,7 +117,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // can ever reach state or storage.
   const setTheme = useCallback((newPreference: UserPreference) => {
     if (!isValidPreference(newPreference)) {
-      if (process.env.NODE_ENV !== 'production') {
+      if (!import.meta.env.PROD) {
         // Diagnosable without exposing the raw value in production logs.
         // eslint-disable-next-line no-console
         console.warn('useTheme.setTheme ignored an invalid theme preference');

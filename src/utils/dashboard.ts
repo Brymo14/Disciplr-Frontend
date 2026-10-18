@@ -108,7 +108,7 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
  */
 export function computeDashboardSummary(vaults: Vault[]): DashboardSummary {
   const ACTIVE_STATUSES: Vault["status"][] = ["active", "pending_validation"];
-  const TERMINAL_STATUSE: Vault["status"][] = ["completed", "failed", "cancelled"];
+  const TERMINAL_STATUSES: Vault["status"][] = ["completed", "failed", "cancelled"];
 
   if (!Array.isArray(vaults)) {
     return { totalLocked: 0, activeVaults: 0, pendingMilestones: 0, completionRate: 0 };

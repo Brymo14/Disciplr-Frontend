@@ -29,16 +29,8 @@ const PERIODS: Period[] = ['7d', '30d', '90d', '1y', 'All']
 // against invalid, duplicate, and boundary-case inputs. They are exported so
 // focused tests can exercise them without rendering the full component.
 
-/** Parse a user-entered numeric goal, returning a safe fallback on invalid input. */
-export function parseGoalInput(raw: string, fallback: number, opts: { min?: number; max?: number } = {}): number {
-  const { min = 0, max = Number.POSITIVE_INFINITY } = opts
-  if (typeof raw !== 'string' || raw.trim() === '') return fallback
-  const n = Number(raw)
-  if (!Number.isFinite(n)) return fallback
-  if (n < min) return min
-  if (n > max) return max
-  return n
-}
+const RATE_GOAL_BOUNDS = { min: 0, max: 100 }
+const CAPITAL_GOAL_BOUNDS = { min: 0, max: 1_000_000_000 }
 
 /** Validate a custom date range. Returns null when the range is not usable. */
 export function validateCustomRange(from: string, to: string): { from: Date; to: Date } | null {
@@ -159,40 +151,18 @@ export default function Analytics() {
   // malformed, reversed) falls back to the selected preset period, and
   // malformed/reversed input surfaces `dateRangeError` instead of failing silently.
   // The preset period buttons are visually deactivated while a custom range is active.
-  const customRangeActive = useMemo(() => {
-    return validateCustomRange(customFrom, customTo) !== null
-  }, [customFrom, customTo])
-
-  // Month abbreviation → 0-based month index used to compare against date inputs
-  const MONTH_INDEX: Record<string, number> = {
-    Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
-    Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
-  }
+  const dateRange = useMemo(() => validateDateRange(customFrom, customTo), [customFrom, customTo])
+  const dateRangeError = dateRange.status === 'invalid' ? dateRange.error : null
+  const customRangeActive = dateRange.status === 'valid'
 
   // ─── Memoized data selections ──────────────────────────────────────────────
-  // A custom range filters the '1y' monthly series to the months whose first
-  // day falls inside the range (inclusive).
+  // A custom range filters the '1y' monthly series to the months inside the range.
   const chartData = useMemo(() => {
-    if (customRangeActive) {
-      const range = validateCustomRange(customFrom, customTo)
-      if (!range) return []
-      const { from, to } = range
-      // Use the '1y' monthly series as the basis for custom filtering.
-      // A data point is included when its month (in the year inferred from the
-      // date inputs) falls between the from and to dates (inclusive).
-      return analyticsPeriodData['1y'].filter((d) => {
-        const monthIdx = MONTH_INDEX[d.name]
-        if (monthIdx === undefined) return true // non-month names (e.g. 'Wk1') pass through
-        // Build a Date for the 1st of that month, using the year from customFrom
-        const pointDate = new Date(from.getFullYear(), monthIdx, 1)
-        // If the range spans into the next year (e.g. Nov → Feb) also check next year
-        const pointDateNextYear = new Date(from.getFullYear() + 1, monthIdx, 1)
-        return (pointDate >= from && pointDate <= to) ||
-          (pointDateNextYear >= from && pointDateNextYear <= to)
-      })
+    if (dateRange.status === 'valid') {
+      return filterMonthlySeries(dedupeByName(analyticsPeriodData['1y']), dateRange.from, dateRange.to)
     }
     return dedupeByName(analyticsPeriodData[period])
-  }, [customRangeActive, customFrom, customTo, period])
+  }, [dateRange, period])
 
   // Invariant: row i of prevChartData describes the same bucket as row i of
   // chartData. Presets are paired with their own previous period; a custom
@@ -972,7 +942,7 @@ const currentStreak = useMemo(() => {
                     )}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: kpis.averageSuccessRate >= Number(goalRate) ? seriesColors.success : 'var(--muted)', marginTop: '0.3rem' }}>
-                    {kpis.averageSuccessRate >= parseGoalInput(goalRate, 90, { min: 0, max: 100 }) ? '✓ Goal achieved!' : `${(parseGoalInput(goalRate, 90, { min: 0, max: 100 }) - kpis.averageSuccessRate).toFixed(1)}% to go`}
+                    {kpis.averageSuccessRate >= (rateGoal.value ?? 90) ? '✓ Goal achieved!' : `${((rateGoal.value ?? 90) - kpis.averageSuccessRate).toFixed(1)}% to go`}
                   </div>
                 </div>
               </div>
@@ -995,15 +965,15 @@ const currentStreak = useMemo(() => {
                     </span>
                   </div>
                   <div style={{ height: 8, background: 'var(--border)', borderRadius: 99, position: 'relative' }}>
-                    <div className="disciplr-progress-bar" style={{ height: '100%', width: `${Math.min((kpis.totalCapital / Math.max(parseGoalInput(goalCapital, 5000, { min: 0 }), kpis.totalCapital)) * 100, 100)}%`, background: seriesColors.success, borderRadius: 99 }} />
+                    <div className="disciplr-progress-bar" style={{ height: '100%', width: `${Math.min((kpis.totalCapital / Math.max((capitalGoal.value ?? 5000), kpis.totalCapital)) * 100, 100)}%`, background: seriesColors.success, borderRadius: 99 }} />
                     <div style={{
                       position: 'absolute', top: -2,
-                      left: `${Math.min((parseGoalInput(goalCapital, 5000, { min: 0 }) / Math.max(parseGoalInput(goalCapital, 5000, { min: 0 }), kpis.totalCapital)) * 100, 100)}%`,
+                      left: `${Math.min(((capitalGoal.value ?? 5000) / Math.max((capitalGoal.value ?? 5000), kpis.totalCapital)) * 100, 100)}%`,
                       width: 3, height: 12, background: seriesColors.comparison, borderRadius: 2, transform: 'translateX(-50%)',
                     }} />
                   </div>
                   <div style={{ fontSize: '0.75rem', color: kpis.totalCapital >= Number(goalCapital) ? seriesColors.success : 'var(--muted)', marginTop: '0.3rem' }}>
-                    {kpis.totalCapital >= parseGoalInput(goalCapital, 5000, { min: 0 }) ? '✓ Goal achieved!' : `$${(parseGoalInput(goalCapital, 5000, { min: 0 }) - kpis.totalCapital).toLocaleString()} to go`}
+                    {kpis.totalCapital >= (capitalGoal.value ?? 5000) ? '✓ Goal achieved!' : `$${((capitalGoal.value ?? 5000) - kpis.totalCapital).toLocaleString()} to go`}
                   </div>
                 </div>
               </div>

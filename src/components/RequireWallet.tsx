@@ -16,7 +16,7 @@ interface RequireWalletProps {
  * - Concurrent/rapid renders must not produce divergent navigation behavior.
  */
 export default function RequireWallet({ children }: RequireWalletProps) {
-  const { address, isConnecting } = useWallet();
+  const { address, isConnecting, connectDemo } = useWallet();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -60,6 +60,12 @@ export default function RequireWallet({ children }: RequireWalletProps) {
       <p>You need a connected wallet to access this page.</p>
       {isConnecting && <p aria-live="polite">Connecting…</p>}
       <WalletConnectButton />
+      <p style={{ marginTop: '1rem' }}>
+        No Freighter wallet?{' '}
+        <button type="button" onClick={connectDemo} style={{ background: 'none', border: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}>
+          Try the demo account
+        </button>
+      </p>
     </div>
   );
 }

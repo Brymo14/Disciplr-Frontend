@@ -234,7 +234,7 @@ export default function ThemeToggle() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        cursor: isTransitioning ? 'not-allowed' : 'pointer',
+        cursor: 'pointer',
         color: 'var(--text)',
         transition: 'all var(--duration-normal, 200ms) var(--ease-in-out, cubic-bezier(0.4, 0, 0.2, 1))',
       }}
