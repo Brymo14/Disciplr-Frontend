@@ -31,9 +31,11 @@ import {
 } from "./api";
 
 export { MASTER_VAULTS } from "../fixtures/vaults";
+export { CreateIntegrityError, type IntegrityMismatches, type IntegrityDiff } from "./createIntegrity";
 
 // ── Re-export canonical types for consumers that need them ────────────────────
 export type { Vault, VaultTransaction };
+
 
 // ── Rich transaction record for the all-vaults explorer page ─────────────────
 // NOT the same as VaultTransaction — this type carries fee, block, from/to/memo
