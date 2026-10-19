@@ -24,6 +24,8 @@ import {
 } from "../utils/deadlinePresets";
 import { getCreateVaultPrefill } from "../utils/vaultPrefill";
 import { createVault, CreateIntegrityError } from "../services/vaultService";
+import { isApiEnabled } from "../services/api";
+import { normalizeEvidenceUrl } from "../utils/url";
 import { isNetworkMismatch, APP_EXPECTED_NETWORK } from "../utils/networkMismatch";
 
 import { isValidStellarAddress } from "../utils/stellarAddress";
@@ -242,7 +244,10 @@ export default function CreateVault() {
     setIsSubmitting(true);
     setSubmitError(null);
 
-    logger.debug("CreateVault confirm", { hasEvidence: Boolean(evidenceUrl) });
+    const normalizedEvidence = evidenceUrl
+      ? normalizeEvidenceUrl(evidenceUrl) ?? undefined
+      : undefined;
+    const apiEnabled = isApiEnabled();
 
     try {
       const newVault = await createVault({
@@ -253,10 +258,13 @@ export default function CreateVault() {
         creatorAddress: address,
         successAddress,
         failureAddress,
-        milestones: milestones.map(({ title, criteria }) => ({
+        milestones: milestones.map(({ title, criteria }, index) => ({
           title,
           description: criteria,
           criteria,
+          ...(index === 0 && !apiEnabled && normalizedEvidence
+            ? { evidenceUrl: normalizedEvidence }
+            : {}),
         })),
       });
       
@@ -742,7 +750,17 @@ export default function CreateVault() {
                 Add milestone
               </button>
             </section>
-            <EvidenceUpload onChange={setEvidenceUrl} />
+            <EvidenceUpload value={evidenceUrl ?? ""} onChange={setEvidenceUrl} />
+            {isApiEnabled() && (
+              <Text
+                role="caption"
+                as="p"
+                data-testid="evidence-api-note"
+                style={{ color: "var(--muted)", margin: 0 }}
+              >
+                Evidence links aren't saved by the API yet
+              </Text>
+            )}
             <button
               type="submit"
               style={{
