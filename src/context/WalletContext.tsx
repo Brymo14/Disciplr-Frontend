@@ -22,7 +22,19 @@ interface WalletState {
     error: string | null;
 }
 
-const initialState: WalletState = {
+export const DEMO_MODE_KEY = 'disciplr:wallet:demoMode';
+
+const isInitialDemo = typeof window !== 'undefined' && localStorage.getItem('disciplr:wallet:demoMode') === 'true' && localStorage.getItem('disciplr:wallet:userDisconnected') !== 'true';
+
+const initialState: WalletState = isInitialDemo ? {
+    status: 'connected',
+    address: 'GBVAQKGA5P4TIZSZJBS5AW3XNJOTYG6I3Y5CLIGCBBUZDHMVF7YE7XCQ',
+    network: 'TESTNET',
+    balance: '10000.0000000',
+    balanceStatus: 'success',
+    balanceError: null,
+    error: null,
+} : {
     status: 'disconnected',
     address: null,
     network: null,
@@ -100,7 +112,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const lastKnownAddressRef = useRef<string | null>(null);
     const lastKnownNetworkRef = useRef<WalletNetwork | null>(null);
     const checkConnectionInProgress = useRef(false);
-    const demoModeRef = useRef(false);
+    const demoModeRef = useRef(isInitialDemo);
 
     const normalizeNetwork = (networkName: string): WalletNetwork => {
         return networkName === 'PUBLIC' ? 'PUBLIC' : 'TESTNET';
@@ -149,6 +161,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         const seq = operationSeqRef.current;
         try {
             if (localStorage.getItem(WALLET_DISCONNECTED_KEY) === 'true') {
+                return;
+            }
+            if (localStorage.getItem(DEMO_MODE_KEY) === 'true') {
+                demoModeRef.current = true;
+                lastKnownAddressRef.current = DEMO_ADDRESS;
+                dispatch({ type: 'CONNECT_SUCCESS', payload: { address: DEMO_ADDRESS, network: 'TESTNET' } });
+                dispatch({ type: 'BALANCE_FETCH_SUCCESS', payload: { balance: '10000.0000000', status: 'success', network: 'TESTNET' } });
                 return;
             }
             if ((await isAllowed()).isAllowed) {
@@ -350,6 +369,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }
         connectInFlightRef.current = null;
         localStorage.setItem(WALLET_DISCONNECTED_KEY, 'true');
+        localStorage.removeItem(DEMO_MODE_KEY);
         lastKnownAddressRef.current = null;
         lastKnownNetworkRef.current = null;
         dispatch({ type: 'DISCONNECT' });
@@ -360,6 +380,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         operationSeqRef.current++;
         demoModeRef.current = true;
         localStorage.removeItem(WALLET_DISCONNECTED_KEY);
+        localStorage.setItem(DEMO_MODE_KEY, 'true');
         lastKnownAddressRef.current = DEMO_ADDRESS;
         dispatch({ type: 'CONNECT_SUCCESS', payload: { address: DEMO_ADDRESS, network: 'TESTNET' } });
         dispatch({ type: 'BALANCE_FETCH_SUCCESS', payload: { balance: '10000.0000000', status: 'success', network: 'TESTNET' } });
