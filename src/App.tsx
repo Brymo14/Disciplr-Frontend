@@ -25,6 +25,11 @@ const Analytics = lazy(() => import('./pages/Analytics'))
 const Notification = lazy(() => import('./pages/Notification'))
 const NotificationSettings = lazy(() => import('./pages/NotificationSettings'))
 
+// Test-only: throws during render so the visual suite can snapshot the ErrorBoundary.
+function VisualCrash(): never {
+  throw new Error('Visual regression test crash')
+}
+
 const PageFallback = <Skeleton className="w-full h-screen" />
 
 /**
@@ -134,6 +139,9 @@ export default function App() {
                     </RouteErrorBoundary>
                   }
                 />
+                {import.meta.env.MODE === 'visual' && (
+                  <Route path="/__visual__/crash" element={<RouteErrorBoundary><VisualCrash /></RouteErrorBoundary>} />
+                )}
                 <Route path="*" element={<RouteErrorBoundary><NotFound /></RouteErrorBoundary>} />
               </Routes>
             </Layout>

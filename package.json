@@ -10,7 +10,9 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:visual": "playwright test -c playwright.visual.config.ts",
+    "test:visual:update": "playwright test -c playwright.visual.config.ts --update-snapshots"
   },
   "dependencies": {
     "@stellar/freighter-api": "^6.0.1",
@@ -28,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
+    "@playwright/test": "1.49.1",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.6.1",
