@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useReducer, useRef, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useReducer, useRef, ReactNode, useCallback } from 'react';
 import { isAllowed, setAllowed, requestAccess, getAddress, getNetworkDetails } from '@stellar/freighter-api';
 import { fetchUsdcBalance } from '../utils/horizon';
 import { logger } from '../utils/logger';
@@ -11,9 +11,11 @@ import {
 export type WalletNetwork = 'TESTNET' | 'PUBLIC';
 export type BalanceStatus = 'idle' | 'loading' | 'success' | 'no_trustline' | 'error';
 export type WalletStatus = 'disconnected' | 'restoring' | 'connecting' | 'connected' | 'error';
+export type SessionStatus = 'resolving' | 'authenticated' | 'anonymous';
 
 interface WalletState {
     status: WalletStatus;
+    sessionStatus: SessionStatus;
     address: string | null;
     network: WalletNetwork | null;
     balance: string | null;
@@ -22,15 +24,30 @@ interface WalletState {
     error: string | null;
 }
 
-const initialState: WalletState = {
-    status: 'disconnected',
-    address: null,
-    network: null,
-    balance: null,
-    balanceStatus: 'idle',
-    balanceError: null,
-    error: null,
+export const WALLET_DISCONNECTED_KEY = 'disciplr:wallet:userDisconnected';
+
+const getInitialSessionStatus = (): { sessionStatus: SessionStatus; status: WalletStatus } => {
+    if (typeof window !== 'undefined' && localStorage.getItem(WALLET_DISCONNECTED_KEY) === 'true') {
+        return { sessionStatus: 'anonymous', status: 'disconnected' };
+    }
+    return { sessionStatus: 'resolving', status: 'restoring' };
 };
+
+const getInitialState = (): WalletState => {
+    const initialSession = getInitialSessionStatus();
+    return {
+        status: initialSession.status,
+        sessionStatus: initialSession.sessionStatus,
+        address: null,
+        network: null,
+        balance: null,
+        balanceStatus: 'idle',
+        balanceError: null,
+        error: null,
+    };
+};
+
+const initialState: WalletState = getInitialState();
 
 type Action =
     | { type: 'RESTORE_START' }
@@ -48,17 +65,42 @@ type Action =
 function walletReducer(state: WalletState, action: Action): WalletState {
     switch (action.type) {
         case 'RESTORE_START':
-            return state.status === 'disconnected' || state.status === 'error' ? { ...state, status: 'restoring', error: null } : state;
+            return {
+                ...state,
+                status: 'restoring',
+                sessionStatus: 'resolving',
+                error: null,
+            };
         case 'RESTORE_ABORT':
-            return state.status === 'restoring' ? { ...state, status: 'disconnected' } : state;
+            return {
+                ...state,
+                status: state.status === 'restoring' ? 'disconnected' : state.status,
+                sessionStatus: 'anonymous',
+            };
         case 'CONNECT_START':
             return { ...state, status: 'connecting', error: null };
         case 'CONNECT_SUCCESS':
-            return { ...state, status: 'connected', address: action.payload.address, network: action.payload.network, error: null };
+            return {
+                ...state,
+                status: 'connected',
+                sessionStatus: 'authenticated',
+                address: action.payload.address,
+                network: action.payload.network,
+                error: null,
+            };
         case 'CONNECT_ERROR':
-            return { ...state, status: 'error', error: action.payload.error };
+            return {
+                ...state,
+                status: 'error',
+                sessionStatus: state.address ? 'authenticated' : 'anonymous',
+                error: action.payload.error,
+            };
         case 'DISCONNECT':
-            return initialState;
+            return {
+                ...initialState,
+                status: 'disconnected',
+                sessionStatus: 'anonymous',
+            };
         case 'BALANCE_FETCH_START':
             return { ...state, balanceStatus: 'loading', balanceError: null };
         case 'BALANCE_FETCH_SUCCESS':
@@ -68,7 +110,12 @@ function walletReducer(state: WalletState, action: Action): WalletState {
         case 'UPDATE_NETWORK':
             return { ...state, network: action.payload.network };
         case 'UPDATE_ADDRESS':
-            return { ...state, address: action.payload.address };
+            return {
+                ...state,
+                status: 'connected',
+                sessionStatus: 'authenticated',
+                address: action.payload.address,
+            };
         default:
             return state;
     }
@@ -89,10 +136,8 @@ export const DEMO_ADDRESS = 'GBVAQKGA5P4TIZSZJBS5AW3XNJOTYG6I3Y5CLIGCBBUZDHMVF7Y
 export const BALANCE_REFRESH_INTERVAL = 30_000;
 export const ACCOUNT_POLL_INTERVAL = 2_000; // Check account explicitly every 2s
 
-export const WALLET_DISCONNECTED_KEY = 'disciplr:wallet:userDisconnected';
-
 export function WalletProvider({ children }: { children: ReactNode }) {
-    const [state, dispatch] = useReducer(walletReducer, initialState);
+    const [state, dispatch] = useReducer(walletReducer, undefined, getInitialState);
     const operationSeqRef = useRef(0);
     const connectInFlightRef = useRef<Promise<boolean> | null>(null);
     const connectAttemptRef = useRef(0);
@@ -149,8 +194,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         const seq = operationSeqRef.current;
         try {
             if (localStorage.getItem(WALLET_DISCONNECTED_KEY) === 'true') {
+                dispatch({ type: 'RESTORE_ABORT' });
                 return;
             }
+            dispatch({ type: 'RESTORE_START' });
             if ((await isAllowed()).isAllowed) {
                 const { address: pubKey, error: addrError } = await getAddress();
                 if (seq !== operationSeqRef.current) return;
@@ -163,6 +210,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                         lastKnownAddressRef.current = pubKey;
                         await fetchNetworkAndBalance(pubKey);
                     }
+                } else {
+                    dispatch({ type: 'RESTORE_ABORT' });
                 }
             } else {
                 dispatch({ type: 'RESTORE_ABORT' });
@@ -170,6 +219,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         } catch (err) {
             if (seq !== operationSeqRef.current) return;
             logger.error('Check connection error', err);
+            dispatch({ type: 'RESTORE_ABORT' });
         } finally {
             checkConnectionInProgress.current = false;
         }
