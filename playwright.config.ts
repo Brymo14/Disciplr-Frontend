@@ -5,6 +5,9 @@ const BASE_URL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: './e2e',
+  // Visual regression specs run only via playwright.visual.config.ts
+  // (pnpm run test:visual / .github/workflows/visual.yml).
+  testIgnore: ['**/visual/**'],
   timeout: 30_000,
   expect: {
     timeout: 5_000,

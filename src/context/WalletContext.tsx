@@ -27,8 +27,19 @@ interface WalletState {
 export const WALLET_DISCONNECTED_KEY = 'disciplr:wallet:userDisconnected';
 export const DEMO_MODE_KEY = 'disciplr:wallet:demoMode';
 
-const readInitialDemoMode = (): boolean =>
-    typeof window !== 'undefined' && localStorage.getItem(DEMO_MODE_KEY) === 'true';
+/** Public, keyless demo account used by "Try demo mode". Not a real funded account. */
+export const DEMO_ADDRESS = 'GBVAQKGA5P4TIZSZJBS5AW3XNJOTYG6I3Y5CLIGCBBUZDHMVF7YE7XCQ';
+const DEMO_NETWORK: WalletNetwork = 'TESTNET';
+const DEMO_BALANCE = '10000.0000000';
+
+const readInitialDemoMode = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    try {
+        return localStorage.getItem(DEMO_MODE_KEY) === 'true';
+    } catch {
+        return false;
+    }
+};
 
 const getInitialSessionStatus = (): { sessionStatus: SessionStatus; status: WalletStatus } => {
     if (typeof window !== 'undefined' && localStorage.getItem(WALLET_DISCONNECTED_KEY) === 'true') {
@@ -37,21 +48,42 @@ const getInitialSessionStatus = (): { sessionStatus: SessionStatus; status: Wall
     return { sessionStatus: 'resolving', status: 'restoring' };
 };
 
-const getInitialState = (): WalletState => {
-    const initialSession = getInitialSessionStatus();
-    return {
-        status: initialSession.status,
-        sessionStatus: initialSession.sessionStatus,
-        address: null,
-        network: null,
-        balance: null,
-        balanceStatus: 'idle',
-        balanceError: null,
-        error: null,
-    };
+const disconnectedState: WalletState = {
+    status: 'disconnected',
+    sessionStatus: 'anonymous',
+    address: null,
+    network: null,
+    balance: null,
+    balanceStatus: 'idle',
+    balanceError: null,
+    error: null,
 };
 
-const initialState: WalletState = getInitialState();
+/** Wallet state for an active demo session (shared by connectDemo and reload restore). */
+const demoState: WalletState = {
+    status: 'connected',
+    sessionStatus: 'authenticated',
+    address: DEMO_ADDRESS,
+    network: DEMO_NETWORK,
+    balance: DEMO_BALANCE,
+    balanceStatus: 'success',
+    balanceError: null,
+    error: null,
+};
+
+const getInitialState = (): WalletState => {
+    // A persisted demo session is restored synchronously so deep links and
+    // reloads render as connected without waiting on (or consulting) Freighter.
+    if (readInitialDemoMode()) {
+        return { ...demoState };
+    }
+    const initialSession = getInitialSessionStatus();
+    return {
+        ...disconnectedState,
+        status: initialSession.status,
+        sessionStatus: initialSession.sessionStatus,
+    };
+};
 
 type Action =
     | { type: 'RESTORE_START' }
@@ -60,6 +92,7 @@ type Action =
     | { type: 'CONNECT_SUCCESS'; payload: { address: string; network: WalletNetwork } }
     | { type: 'CONNECT_ERROR'; payload: { error: string } }
     | { type: 'DISCONNECT' }
+    | { type: 'DEMO_CONNECT' }
     | { type: 'BALANCE_FETCH_START' }
     | { type: 'BALANCE_FETCH_SUCCESS'; payload: { balance: string | null; status: BalanceStatus; network: WalletNetwork } }
     | { type: 'BALANCE_FETCH_ERROR'; payload: { error: string } }
@@ -100,11 +133,9 @@ function walletReducer(state: WalletState, action: Action): WalletState {
                 error: action.payload.error,
             };
         case 'DISCONNECT':
-            return {
-                ...initialState,
-                status: 'disconnected',
-                sessionStatus: 'anonymous',
-            };
+            return { ...disconnectedState };
+        case 'DEMO_CONNECT':
+            return { ...demoState };
         case 'BALANCE_FETCH_START':
             return { ...state, balanceStatus: 'loading', balanceError: null };
         case 'BALANCE_FETCH_SUCCESS':
@@ -135,8 +166,6 @@ interface WalletContextType extends WalletState {
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
-/** Public, keyless demo account used by "Try demo mode". Not a real funded account. */
-export const DEMO_ADDRESS = 'GBVAQKGA5P4TIZSZJBS5AW3XNJOTYG6I3Y5CLIGCBBUZDHMVF7YE7XCQ';
 export const BALANCE_REFRESH_INTERVAL = 30_000;
 export const ACCOUNT_POLL_INTERVAL = 2_000; // Check account explicitly every 2s
 
@@ -146,10 +175,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const connectInFlightRef = useRef<Promise<boolean> | null>(null);
     const connectAttemptRef = useRef(0);
     const abortControllerRef = useRef<AbortController | null>(null);
-    const lastKnownAddressRef = useRef<string | null>(null);
-    const lastKnownNetworkRef = useRef<WalletNetwork | null>(null);
     const checkConnectionInProgress = useRef(false);
-    const demoModeRef = useRef(readInitialDemoMode());
+    // True when the provider mounted with a persisted demo session (state was
+    // initialised from demoState by getInitialState above).
+    const demoModeRef = useRef(state.address === DEMO_ADDRESS);
+    const lastKnownAddressRef = useRef<string | null>(demoModeRef.current ? DEMO_ADDRESS : null);
+    const lastKnownNetworkRef = useRef<WalletNetwork | null>(demoModeRef.current ? DEMO_NETWORK : null);
 
     const normalizeNetwork = (networkName: string): WalletNetwork => {
         return networkName === 'PUBLIC' ? 'PUBLIC' : 'TESTNET';
@@ -197,6 +228,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         checkConnectionInProgress.current = true;
         const seq = operationSeqRef.current;
         try {
+            // An active demo session is never overridden by Freighter restore.
+            if (demoModeRef.current) return;
             if (localStorage.getItem(WALLET_DISCONNECTED_KEY) === 'true') {
                 dispatch({ type: 'RESTORE_ABORT' });
                 return;
@@ -204,7 +237,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             dispatch({ type: 'RESTORE_START' });
             if ((await isAllowed()).isAllowed) {
                 const { address: pubKey, error: addrError } = await getAddress();
-                if (seq !== operationSeqRef.current) return;
+                if (seq !== operationSeqRef.current || demoModeRef.current) return;
                 
                 if (pubKey && !addrError) {
                     dispatch({ type: 'UPDATE_ADDRESS', payload: { address: pubKey } });
@@ -310,6 +343,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 
                 if (pubKey && !addrError) {
                     localStorage.removeItem(WALLET_DISCONNECTED_KEY);
+                    // A real wallet connection supersedes demo mode.
+                    demoModeRef.current = false;
+                    localStorage.removeItem(DEMO_MODE_KEY);
                     lastKnownAddressRef.current = pubKey;
                     const netDetails = await getNetworkDetails();
                     if (seq !== operationSeqRef.current) return false;
@@ -416,9 +452,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         demoModeRef.current = true;
         localStorage.removeItem(WALLET_DISCONNECTED_KEY);
         localStorage.setItem(DEMO_MODE_KEY, 'true');
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
         lastKnownAddressRef.current = DEMO_ADDRESS;
-        dispatch({ type: 'CONNECT_SUCCESS', payload: { address: DEMO_ADDRESS, network: 'TESTNET' } });
-        dispatch({ type: 'BALANCE_FETCH_SUCCESS', payload: { balance: '10000.0000000', status: 'success', network: 'TESTNET' } });
+        lastKnownNetworkRef.current = DEMO_NETWORK;
+        dispatch({ type: 'DEMO_CONNECT' });
     }, []);
 
     const isConnecting = state.status === 'connecting' || state.status === 'restoring';
