@@ -133,19 +133,19 @@ export async function apiCreateVault(input: {
 }
 
 
-export async function apiValidateNextMilestone(vault: Vault): Promise<void> {
+export async function apiValidateNextMilestone(vault: Vault, actor: string): Promise<void> {
   const next = vault.milestones.find((m) => m.status === "pending");
   if (!next) throw new Error("No pending milestone to validate.");
   await request(`/vaults/${encodeURIComponent(vault.id)}/milestones/${encodeURIComponent(next.id)}/validate`, {
     method: "POST",
-    body: JSON.stringify({ verifier: vault.verifierAddress }),
+    body: JSON.stringify({ verifier: actor }),
   });
 }
 
-export async function apiFailVault(vault: Vault): Promise<void> {
+export async function apiFailVault(vault: Vault, actor: string): Promise<void> {
   await request(`/vaults/${encodeURIComponent(vault.id)}/fail`, {
     method: "POST",
-    body: JSON.stringify({ verifier: vault.verifierAddress }),
+    body: JSON.stringify({ verifier: actor }),
   });
 }
 
