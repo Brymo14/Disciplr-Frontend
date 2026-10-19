@@ -23,6 +23,17 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Generate design tokens (drift check)
+        run: |
+          pnpm run tokens:build
+          git diff --exit-code src/styles/tokens.generated.css
+      - name: Check CSS variable references
+        run: pnpm run tokens:check
+      - name: Install design-system deps (no lifecycle scripts)
+        run: npm ci --ignore-scripts --prefix design-system
+      - name: Design-system tests
+        working-directory: design-system
+        run: npx --no-install jest
       - run: pnpm run lint
       - run: pnpm run build
       - run: pnpm run test

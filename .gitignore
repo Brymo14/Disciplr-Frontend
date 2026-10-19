@@ -12,3 +12,9 @@ playwright-report/
 .opencode
 .vercel
 .env*
+
+design-system/coverage/
+
+# Playwright
+test-results
+playwright-report
