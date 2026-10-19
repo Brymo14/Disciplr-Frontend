@@ -25,6 +25,10 @@ interface WalletState {
 }
 
 export const WALLET_DISCONNECTED_KEY = 'disciplr:wallet:userDisconnected';
+export const DEMO_MODE_KEY = 'disciplr:wallet:demoMode';
+
+const readInitialDemoMode = (): boolean =>
+    typeof window !== 'undefined' && localStorage.getItem(DEMO_MODE_KEY) === 'true';
 
 const getInitialSessionStatus = (): { sessionStatus: SessionStatus; status: WalletStatus } => {
     if (typeof window !== 'undefined' && localStorage.getItem(WALLET_DISCONNECTED_KEY) === 'true') {
@@ -145,7 +149,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const lastKnownAddressRef = useRef<string | null>(null);
     const lastKnownNetworkRef = useRef<WalletNetwork | null>(null);
     const checkConnectionInProgress = useRef(false);
-    const demoModeRef = useRef(isInitialDemo);
+    const demoModeRef = useRef(readInitialDemoMode());
 
     const normalizeNetwork = (networkName: string): WalletNetwork => {
         return networkName === 'PUBLIC' ? 'PUBLIC' : 'TESTNET';
