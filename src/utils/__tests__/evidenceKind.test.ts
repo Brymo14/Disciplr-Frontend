@@ -90,7 +90,7 @@ describe('evidenceKind', () => {
 
       // Punycode / IDN hosts
       ['https://xn--githb-xxx.com/x', { kind: 'other', host: 'xn--githb-xxx.com' }],
-      ['https://xn--sub.github.com/x', { kind: 'other', host: 'xn--sub.github.com' }],
+      ['https://xn--sb-xka.github.com/x', { kind: 'other', host: 'xn--sb-xka.github.com' }],
       ['https://xn--figm-qoa.com/x', { kind: 'other', host: 'xn--figm-qoa.com' }],
 
       // Ports
