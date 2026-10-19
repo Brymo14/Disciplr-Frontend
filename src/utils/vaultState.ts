@@ -38,6 +38,7 @@
 import type { Milestone, MilestoneStatus, Vault, VaultStatus } from "../types/vault";
 import { isValidStellarAddress } from "./stellarAddress";
 import { isNetworkMismatch } from "./networkMismatch";
+import { isApiEnabled } from "../services/api";
 
 export { isValidStellarAddress };
 
@@ -566,6 +567,9 @@ export function isVaultAction(value: unknown): value is VaultAction {
  *  and cancel). Offline fixture mode keeps the legacy creator-or-verifier
  *  rules so local demos continue to work. */
 export type VaultActionMode = "api" | "offline";
+
+/** Current execution mode: "api" when VITE_API is configured, else offline fixtures. */
+export const isApiMode = (): boolean => isApiEnabled();
 
 export type VaultActionRole = "creator" | "verifier";
 

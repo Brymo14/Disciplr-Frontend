@@ -7,17 +7,10 @@ on:
         description: 'Regenerate baselines (uploaded as the visual-baselines artefact)'
         type: boolean
         default: false
-  pull_request:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'design-system/**'
-      - 'index.html'
-      - 'e2e/visual/**'
-      - 'playwright.visual.config.ts'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/visual.yml'
+  # No committed baselines yet (e2e/visual/__screenshots__/ is empty), so this
+  # workflow is manual-only. Run it with update=true to generate baselines,
+  # download the visual-baselines artefact, commit it, then re-enable
+  # pull_request triggers if desired.
 
 concurrency:
   group: visual-${{ github.workflow }}-${{ github.ref }}

@@ -303,6 +303,7 @@ function VaultDetailContent({
         walletAddress,
         walletNetwork,
         expectedNetwork: APP_EXPECTED_NETWORK,
+        mode: isApiMode() ? "api" : "offline",
       });
     }
     return results;
