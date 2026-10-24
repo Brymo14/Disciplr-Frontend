@@ -5,6 +5,19 @@ import Vaults from '../Vaults';
 import { useConnectivityStore } from '../../services/connectivity';
 import * as vaultService from '../../services/vaultService';
 
+vi.mock('../../context/WalletContext', () => ({
+  useWallet: () => ({
+    address: null,
+    sessionStatus: 'anonymous',
+    connectDemo: vi.fn(),
+    isConnecting: false,
+  }),
+}));
+
+vi.mock('../../components/Wallet/WalletConnectButton', () => ({
+  WalletConnectButton: () => <button>Connect Wallet</button>,
+}));
+
 vi.mock('../../services/api', () => ({
   isApiEnabled: () => true,
   API_BASE: 'https://api.disciplr.app',
