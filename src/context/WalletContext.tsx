@@ -9,7 +9,15 @@ import {
 } from '@stellar/freighter-api';
 import { fetchUsdcBalance } from '../utils/horizon';
 import { logger } from '../utils/logger';
-import { recordWalletTelemetry, classifyConnectError } from '../utils/walletTelemetry';
+import {
+    recordWalletTelemetry,
+    classifyConnectError,
+    resolveConnectTimeoutMs,
+    type ConnectErrorCode,
+} from '../utils/walletTelemetry';
+import { setDemoMode } from '../services/vaultService';
+import { resetDemoStore } from '../services/demoStore';
+import { withTimeout, ConnectTimeoutError } from '../utils/withTimeout';
 
 export type WalletNetwork = 'TESTNET' | 'PUBLIC';
 export type BalanceStatus = 'idle' | 'loading' | 'success' | 'no_trustline' | 'error';
@@ -25,10 +33,11 @@ interface WalletState {
     balanceStatus: BalanceStatus;
     balanceError: string | null;
     error: string | null;
+    isDemo: boolean;
 }
 
 export const WALLET_DISCONNECTED_KEY = 'disciplr:wallet:userDisconnected';
-export const DEMO_MODE_KEY = 'disciplr:wallet:demoMode';
+export const DEMO_MODE_KEY = 'disciplr:wallet:demo';
 
 /** Public, keyless demo account used by "Try demo mode". Not a real funded account. */
 export const DEMO_ADDRESS = 'GBVAQKGA5P4TIZSZJBS5AW3XNJOTYG6I3Y5CLIGCBBUZDHMVF7YE7XCQ';
@@ -38,9 +47,26 @@ const DEMO_BALANCE = '10000.0000000';
 const readInitialDemoMode = (): boolean => {
     if (typeof window === 'undefined') return false;
     try {
-        return localStorage.getItem(DEMO_MODE_KEY) === 'true';
+        const fromSession = window.sessionStorage?.getItem(DEMO_MODE_KEY) === 'true';
+        const fromLocal = window.localStorage?.getItem(DEMO_MODE_KEY) === 'true';
+        return fromSession || fromLocal;
     } catch {
         return false;
+    }
+};
+
+const persistDemoSession = (active: boolean) => {
+    if (typeof window === 'undefined') return;
+    try {
+        if (active) {
+            window.sessionStorage?.setItem(DEMO_MODE_KEY, 'true');
+            window.localStorage?.setItem(DEMO_MODE_KEY, 'true');
+        } else {
+            window.sessionStorage?.removeItem(DEMO_MODE_KEY);
+            window.localStorage?.removeItem(DEMO_MODE_KEY);
+        }
+    } catch {
+        // Fall back gracefully if storage is restricted
     }
 };
 
@@ -60,6 +86,7 @@ const disconnectedState: WalletState = {
     balanceStatus: 'idle',
     balanceError: null,
     error: null,
+    isDemo: false,
 };
 
 /** Wallet state for an active demo session (shared by connectDemo and reload restore). */
@@ -72,14 +99,17 @@ const demoState: WalletState = {
     balanceStatus: 'success',
     balanceError: null,
     error: null,
+    isDemo: true,
 };
 
 const getInitialState = (): WalletState => {
     // A persisted demo session is restored synchronously so deep links and
     // reloads render as connected without waiting on (or consulting) Freighter.
     if (readInitialDemoMode()) {
+        setDemoMode(true);
         return { ...demoState };
     }
+    setDemoMode(false);
     const initialSession = getInitialSessionStatus();
     return {
         ...disconnectedState,
@@ -126,6 +156,7 @@ export function walletReducer(state: WalletState, action: Action): WalletState {
                 sessionStatus: 'authenticated',
                 address: action.payload.address,
                 network: action.payload.network,
+                isDemo: false,
                 error: null,
             };
         case 'CONNECT_ERROR':
@@ -162,15 +193,19 @@ export function walletReducer(state: WalletState, action: Action): WalletState {
 interface WalletContextType extends WalletState {
     isConnecting: boolean;
     connect: () => Promise<boolean>;
+    cancelConnect: () => void;
     disconnect: () => void;
     checkConnection: () => Promise<void>;
     connectDemo: () => void;
+    resetDemo: () => void;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export const BALANCE_REFRESH_INTERVAL = 30_000;
 export const WALLET_WATCH_INTERVAL = 3_000;
+/** @deprecated account changes are now observed via WatchWalletChanges every WALLET_WATCH_INTERVAL. */
+export const ACCOUNT_POLL_INTERVAL = WALLET_WATCH_INTERVAL;
 
 const normalizeNetwork = (networkName: string): WalletNetwork => {
     return networkName === 'PUBLIC' ? 'PUBLIC' : 'TESTNET';
@@ -181,14 +216,21 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const operationSeqRef = useRef(0);
     const connectInFlightRef = useRef<Promise<boolean> | null>(null);
     const connectAttemptRef = useRef(0);
+    const connectStartTsRef = useRef<number | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const checkConnectionInProgress = useRef(false);
     const isMountedRef = useRef(true);
     // True when the provider mounted with a persisted demo session (state was
     // initialised from demoState by getInitialState above).
-    const demoModeRef = useRef(state.address === DEMO_ADDRESS);
+    const demoModeRef = useRef(state.isDemo);
     const lastKnownAddressRef = useRef<string | null>(demoModeRef.current ? DEMO_ADDRESS : null);
     const lastKnownNetworkRef = useRef<WalletNetwork | null>(demoModeRef.current ? DEMO_NETWORK : null);
+
+    // Keep vaultService demo routing synced with state.isDemo
+    useEffect(() => {
+        demoModeRef.current = state.isDemo;
+        setDemoMode(state.isDemo);
+    }, [state.isDemo]);
 
     const fetchNetworkAndBalance = useCallback(
         async (pubKey: string, providedSeq?: number, knownNetwork?: WalletNetwork) => {
@@ -294,6 +336,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort();
             }
+            connectInFlightRef.current = null;
+            connectStartTsRef.current = null;
             operationSeqRef.current++;
         };
     }, [checkConnection]);
@@ -355,43 +399,40 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         };
     }, [state.address, fetchNetworkAndBalance]);
 
-    const performConnect = async (attempt: number): Promise<boolean> => {
+    const performConnect = useCallback(async (attempt: number): Promise<boolean> => {
         const seq = ++operationSeqRef.current;
         const startedAt = Date.now();
+        connectStartTsRef.current = startedAt;
         dispatch({ type: 'CONNECT_START' });
+        const timeoutMs = resolveConnectTimeoutMs(import.meta.env.VITE_WALLET_CONNECT_TIMEOUT_MS);
+        let wasTimedOut = false;
+
         try {
-            await setAllowed();
-            if (seq !== operationSeqRef.current) return false;
-            
-            const access = await requestAccess();
-            if (seq !== operationSeqRef.current) return false;
-            
-            if (access) {
-                const { address: pubKey, error: addrError } = await getAddress();
+            const connected = await withTimeout((async () => {
+                await setAllowed();
                 if (seq !== operationSeqRef.current) return false;
-                
-                if (pubKey && !addrError) {
-                    localStorage.removeItem(WALLET_DISCONNECTED_KEY);
-                    // A real wallet connection supersedes demo mode.
-                    demoModeRef.current = false;
-                    localStorage.removeItem(DEMO_MODE_KEY);
-                    lastKnownAddressRef.current = pubKey;
-                    const netDetails = await getNetworkDetails();
-                    if (seq !== operationSeqRef.current) return false;
-                    const activeNetwork = normalizeNetwork(netDetails.network);
-                    lastKnownNetworkRef.current = activeNetwork;
-                    
-                    dispatch({ type: 'CONNECT_SUCCESS', payload: { address: pubKey, network: activeNetwork } });
-                    await fetchNetworkAndBalance(pubKey, seq, activeNetwork);
+
+                const access = await requestAccess();
+                if (seq !== operationSeqRef.current) return false;
+
+                if (!access) {
+                    const errorMsg = 'Wallet access denied.';
+                    dispatch({ type: 'CONNECT_ERROR', payload: { error: errorMsg } });
                     recordWalletTelemetry({
-                        event: 'wallet.connect.success',
+                        event: 'wallet.connect.failure',
                         ts: Date.now(),
                         wallet: 'freighter',
                         durationMs: Date.now() - startedAt,
                         attempt,
+                        errorCode: 'access_denied',
                     });
-                    return true;
-                } else {
+                    return false;
+                }
+
+                const { address: pubKey, error: addrError } = await getAddress();
+                if (seq !== operationSeqRef.current) return false;
+
+                if (!pubKey || addrError) {
                     const errorMsg = addrError || 'Failed to get wallet address.';
                     dispatch({ type: 'CONNECT_ERROR', payload: { error: errorMsg } });
                     recordWalletTelemetry({
@@ -402,42 +443,74 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                         attempt,
                         errorCode: classifyConnectError(errorMsg),
                     });
+                    return false;
                 }
-            } else {
-                const errorMsg = 'Wallet access denied.';
-                dispatch({ type: 'CONNECT_ERROR', payload: { error: errorMsg } });
+
+                localStorage.removeItem(WALLET_DISCONNECTED_KEY);
+                // A real wallet connection supersedes demo mode.
+                demoModeRef.current = false;
+                setDemoMode(false);
+                persistDemoSession(false);
+                lastKnownAddressRef.current = pubKey;
+                const netDetails = await getNetworkDetails();
+                if (seq !== operationSeqRef.current) return false;
+
+                const activeNetwork = normalizeNetwork(netDetails.network);
+                lastKnownNetworkRef.current = activeNetwork;
+
+                dispatch({ type: 'CONNECT_SUCCESS', payload: { address: pubKey, network: activeNetwork } });
+                await fetchNetworkAndBalance(pubKey, seq, activeNetwork);
                 recordWalletTelemetry({
-                    event: 'wallet.connect.failure',
+                    event: 'wallet.connect.success',
                     ts: Date.now(),
                     wallet: 'freighter',
                     durationMs: Date.now() - startedAt,
                     attempt,
-                    errorCode: classifyConnectError(errorMsg),
                 });
-            }
+                return true;
+            })(), timeoutMs, () => {
+                if (seq !== operationSeqRef.current) return;
+                wasTimedOut = true;
+                operationSeqRef.current += 1;
+            });
 
-            return false;
+            return connected;
         } catch (err: unknown) {
+            if (err instanceof ConnectTimeoutError) {
+                if (!wasTimedOut || seq !== operationSeqRef.current - 1) {
+                    return false;
+                }
+                const durationMs = Date.now() - startedAt;
+                dispatch({ type: 'CONNECT_ERROR', payload: { error: "Freighter didn't respond. Check the extension popup and try again." } });
+                recordWalletTelemetry({
+                    event: 'wallet.connect.timeout',
+                    ts: Date.now(),
+                    wallet: 'freighter',
+                    durationMs,
+                    timeoutMs,
+                    attempt,
+                });
+                return false;
+            }
             if (seq !== operationSeqRef.current) return false;
+
             logger.error('Connection error', err);
-            const message = err instanceof Error ? err.message : undefined;
-            dispatch({ type: 'CONNECT_ERROR', payload: { error: message || 'Failed to connect wallet. Make sure Freighter is installed and unlocked.' } });
+            const message = err instanceof Error ? err.message : 'Failed to connect wallet. Make sure Freighter is installed and unlocked.';
+            const errorCode = classifyConnectError(message);
+            dispatch({ type: 'CONNECT_ERROR', payload: { error: message } });
             recordWalletTelemetry({
                 event: 'wallet.connect.failure',
                 ts: Date.now(),
                 wallet: 'freighter',
                 durationMs: Date.now() - startedAt,
                 attempt,
-                errorCode: classifyConnectError(message),
+                errorCode,
             });
             return false;
         }
-    };
+    }, [fetchNetworkAndBalance]);
 
-    const connect = (): Promise<boolean> => {
-        // Bounded concurrency: a second connect() call while one is already in
-        // flight returns the in-flight promise instead of prompting Freighter
-        // again, so rapid user interaction never stacks authorization prompts.
+    const connect = useCallback((): Promise<boolean> => {
         if (connectInFlightRef.current) {
             recordWalletTelemetry({
                 event: 'wallet.connect.ignored',
@@ -447,29 +520,60 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             });
             return connectInFlightRef.current;
         }
+
         connectAttemptRef.current += 1;
-        const promise = performConnect(connectAttemptRef.current);
+        const attempt = connectAttemptRef.current;
+        recordWalletTelemetry({
+            event: 'wallet.connect.attempt',
+            ts: Date.now(),
+            wallet: 'freighter',
+            attempt,
+        });
+
+        const promise = performConnect(attempt);
         connectInFlightRef.current = promise;
-        void promise.then(
-            () => {
+        void promise.finally(() => {
+            if (connectInFlightRef.current === promise) {
                 connectInFlightRef.current = null;
-            },
-            () => {
-                connectInFlightRef.current = null;
-            },
-        );
+            }
+            // Clear the start timestamp only if a newer attempt hasn't started.
+            if (connectAttemptRef.current === attempt) {
+                connectStartTsRef.current = null;
+            }
+        });
         return promise;
-    };
+    }, [performConnect]);
+
+    const cancelConnect = useCallback(() => {
+        const attempt = connectAttemptRef.current;
+        const startedAt = connectStartTsRef.current ?? Date.now();
+        operationSeqRef.current += 1;
+        connectInFlightRef.current = null;
+        connectStartTsRef.current = null;
+
+        dispatch({ type: 'CONNECT_ERROR', payload: { error: 'Freighter connection cancelled. Close the popup and try again.' } });
+        recordWalletTelemetry({
+            event: 'wallet.connect.failure',
+            ts: Date.now(),
+            wallet: 'freighter',
+            durationMs: Date.now() - startedAt,
+            attempt,
+            errorCode: 'cancelled',
+        });
+    }, []);
 
     const disconnect = useCallback(() => {
         demoModeRef.current = false;
+        setDemoMode(false);
+        resetDemoStore();
         operationSeqRef.current++;
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
         connectInFlightRef.current = null;
+        connectStartTsRef.current = null;
         localStorage.setItem(WALLET_DISCONNECTED_KEY, 'true');
-        localStorage.removeItem(DEMO_MODE_KEY);
+        persistDemoSession(false);
         lastKnownAddressRef.current = null;
         lastKnownNetworkRef.current = null;
         dispatch({ type: 'DISCONNECT' });
@@ -479,14 +583,23 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const connectDemo = useCallback(() => {
         operationSeqRef.current++;
         demoModeRef.current = true;
+        setDemoMode(true);
         localStorage.removeItem(WALLET_DISCONNECTED_KEY);
-        localStorage.setItem(DEMO_MODE_KEY, 'true');
+        persistDemoSession(true);
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
         lastKnownAddressRef.current = DEMO_ADDRESS;
         lastKnownNetworkRef.current = DEMO_NETWORK;
         dispatch({ type: 'DEMO_CONNECT' });
+    }, []);
+
+    const resetDemo = useCallback(() => {
+        resetDemoStore();
+        // Trigger re-render or notification if needed
+        if (demoModeRef.current) {
+            dispatch({ type: 'DEMO_CONNECT' });
+        }
     }, []);
 
     const isConnecting = state.status === 'connecting' || state.status === 'restoring';
@@ -497,14 +610,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 ...state,
                 isConnecting,
                 connect,
+                cancelConnect,
                 disconnect,
                 checkConnection,
                 connectDemo,
+                resetDemo,
             }}
         >
             {children}
         </WalletContext.Provider>
     );
+}
+
+export function useOptionalWallet(): WalletContextType | undefined {
+    return useContext(WalletContext);
 }
 
 export function useWallet() {
@@ -514,3 +633,4 @@ export function useWallet() {
     }
     return context;
 }
+

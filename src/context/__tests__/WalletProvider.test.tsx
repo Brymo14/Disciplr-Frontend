@@ -108,6 +108,7 @@ describe('WalletProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
     freighter.instances.length = 0;
     telemetrySpy = vi.spyOn(walletTelemetry, 'recordWalletTelemetry');
     freighter.isAllowed.mockResolvedValue({ isAllowed: true });

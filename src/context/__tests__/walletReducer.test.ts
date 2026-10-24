@@ -13,6 +13,7 @@ const disconnectedState: WalletState = {
   balanceStatus: 'idle',
   balanceError: null,
   error: null,
+  isDemo: false,
 };
 
 const connectedState: WalletState = {
@@ -24,6 +25,7 @@ const connectedState: WalletState = {
   balanceStatus: 'success',
   balanceError: null,
   error: null,
+  isDemo: false,
 };
 
 describe('walletReducer', () => {
@@ -134,6 +136,7 @@ describe('walletReducer', () => {
       balanceStatus: 'success',
       balanceError: null,
       error: null,
+      isDemo: true,
     });
   });
 
