@@ -16,6 +16,7 @@ import { duration } from "../utils/motion";
 import { usePrefersReducedMotion } from "../utils/usePrefersReducedMotion";
 import { useTheme } from "../context/ThemeContext";
 import { registerShortcut } from "../utils/shortcutRegistry";
+import { formatUsdc } from "../utils/format";
 
 const RECENTS_STORAGE_KEY = "disciplr:palette:recent:v1";
 
@@ -163,7 +164,7 @@ function vaultToCommand(vault: Vault): CommandItem {
   return {
     id: `vault-${vault.id}`,
     label: vault.name,
-    description: `Vault ${vault.id} · ${vault.amount.toLocaleString()} ${vault.currency}`,
+    description: `Vault ${vault.id} · ${formatUsdc(vault.amount)} ${vault.currency}`,
     to: `/vaults/${vault.id}`,
     group: "Vaults",
     kind: "vault",

@@ -4,6 +4,7 @@ import { Text } from './Text';
 import { deadlineUrgency, type UrgencyTier } from '../utils/vaultUrgency';
 import type { Deadline } from '../utils/dashboard';
 import type { Vault } from '../types/vault';
+import { formatUsdc } from '../utils/format';
 import {
   downloadIcsEvent,
   downloadIcsCalendar,
@@ -251,7 +252,7 @@ export default function UpcomingDeadlines({ deadlines, vaults }: UpcomingDeadlin
                   </span>
                 </div>
                 <Text role="caption" as="div" style={{ color: 'var(--muted)', marginBottom: 2 }}>
-                  {item.amount.toLocaleString()} USDC
+                  {formatUsdc(item.amount)} USDC
                 </Text>
                 <CountdownDeadline deadline={item.deadline} />
                 <button

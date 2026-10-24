@@ -1,5 +1,6 @@
 import { Text } from "./Text";
 import { AddressDisplay } from "./AddressDisplay";
+import { formatDateTime, formatUsdc } from "../utils/format";
 import { isApiEnabled } from "../services/api";
 import { useConnectivityStore } from "../services/connectivity";
 
@@ -162,7 +163,7 @@ export function CreateVaultReview({
             Amount (USDC)
           </Text>
           <Text role="body" as="p">
-            {amount}
+            {formatUsdc(amount)}
           </Text>
         </div>
 
@@ -173,7 +174,11 @@ export function CreateVaultReview({
             Deadline
           </Text>
           <Text role="body" as="p">
-            {deadline}
+            {(() => {
+              const localFormatted = formatDateTime(deadline);
+              const utcFormatted = formatDateTime(deadline, { timeZone: "UTC" });
+              return `${localFormatted} (${utcFormatted} UTC)`;
+            })()}
           </Text>
         </div>
 
